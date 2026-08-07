@@ -26,6 +26,7 @@ struct ProductView: View {
                     .font(.footnote)
                     .fontWeight(.bold)
                     .foregroundStyle(Color.secondary)
+                   
                 if let description = product.description {
                     HStack(alignment: .top) {
                         Image(systemName: "pencil.and.list.clipboard")
@@ -34,6 +35,8 @@ struct ProductView: View {
                     .font(.caption)
                     .padding(.top, 4)
                     .foregroundStyle(Color.secondary)
+                  
+                    
                 }
             }
             Spacer()
@@ -47,6 +50,7 @@ struct ProductView: View {
                     .foregroundStyle(product.isPurchased ? Color.green : Color.gray.opacity(0.5) )
             }
         }
+        .strikethrough(product.isPurchased)
     }
 }
 
