@@ -7,7 +7,7 @@
 
 import Foundation
 
-struct Product: Identifiable {
+struct Product: Identifiable, Codable {
     var id: String = UUID().uuidString
     var title: String
     var description: String?
@@ -15,4 +15,11 @@ struct Product: Identifiable {
     
     var isPurchased: Bool = false
     var quantity: Int = 1
+    
+    enum CodingKeys: String, CodingKey {
+        case id
+        case title = "product_name"
+        case description
+        case image
+    }
 }

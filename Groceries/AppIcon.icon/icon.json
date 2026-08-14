@@ -1,22 +1,32 @@
 {
   "fill" : {
-    "linear-gradient" : [
-      "display-p3:0.84030,1.00000,0.20340,1.00000",
-      "display-p3:0.23273,0.96783,0.96401,1.00000"
-    ],
-    "orientation" : {
-      "start" : {
-        "x" : 0.5,
-        "y" : 0
-      },
-      "stop" : {
-        "x" : 0.5,
-        "y" : 0.7
-      }
-    }
+    "solid" : "display-p3:0.96748,0.95492,1.00000,1.00000"
   },
   "groups" : [
-
+    {
+      "layers" : [
+        {
+          "glass" : false,
+          "image-name" : "Image.png",
+          "name" : "Image",
+          "position" : {
+            "scale" : 1.03,
+            "translation-in-points" : [
+              0,
+              0
+            ]
+          }
+        }
+      ],
+      "shadow" : {
+        "kind" : "neutral",
+        "opacity" : 0.5
+      },
+      "translucency" : {
+        "enabled" : true,
+        "value" : 0.5
+      }
+    }
   ],
   "supported-platforms" : {
     "circles" : [
