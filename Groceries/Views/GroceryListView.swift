@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import Lottie
 
 struct GroceryListView: View {
     
@@ -13,18 +14,24 @@ struct GroceryListView: View {
     
     var body: some View {
         NavigationStack {
-            List {
-                ForEach($productViewModel.products) { product in
-                    ProductView(product: product)
-                }
-            }
-            .toolbar {
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Add", systemImage: "plus") {
-                        productViewModel.add(Product(title: "Banana"))
+            ZStack {
+                List {
+                    ForEach($productViewModel.products) { product in
+                        ProductView(product: product)
                     }
                 }
+                .toolbar {
+                    ToolbarItem(placement: .confirmationAction) {
+                        Button("Add", systemImage: "plus") {
+                            productViewModel.add(Product(title: "Banana"))
+                        }
+                    }
+                }
+                LottieView(animation: .named("confetti"))
+                    .playing(loopMode: .loop)
+                    .ignoresSafeArea()
             }
+            
         }
     }
 }

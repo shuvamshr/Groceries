@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import Lottie
 
 struct ProductView: View {
     
@@ -45,9 +46,16 @@ struct ProductView: View {
                     product.isPurchased.toggle()
                 }
             } label: {
-                Image(systemName: product.isPurchased ? "checkmark.circle.fill" : "circle")
-                    .imageScale(.large)
-                    .foregroundStyle(product.isPurchased ? Color.green : Color.gray.opacity(0.5) )
+                if product.isPurchased {
+                    LottieView(animation: .named("success"))
+                        .playing(loopMode: .playOnce)
+                        .animationSpeed(0.5)
+                        .frame(width: 28, height: 28)
+                } else {
+                    Image(systemName: "circle")
+                        .imageScale(.large)
+                        .foregroundStyle(Color.gray.opacity(0.5) )
+                }
             }
         }
         .strikethrough(product.isPurchased)
