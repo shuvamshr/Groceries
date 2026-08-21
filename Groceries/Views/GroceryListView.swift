@@ -9,12 +9,21 @@ import SwiftUI
 
 struct GroceryListView: View {
     
-    @StateObject private var productViewModel = ProductViewModel()
+    @StateObject private var productViewModel = ProductViewModel(repository: LocalProductRepository())
     
     var body: some View {
-        List {
-            ForEach($productViewModel.products) { product in
-                ProductView(product: product)
+        NavigationStack {
+            List {
+                ForEach($productViewModel.products) { product in
+                    ProductView(product: product)
+                }
+            }
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Add", systemImage: "plus") {
+                        productViewModel.add(Product(title: "Banana"))
+                    }
+                }
             }
         }
     }
