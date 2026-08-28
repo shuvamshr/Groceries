@@ -10,11 +10,10 @@ import Lottie
 
 struct GroceryListView: View {
     
-    @StateObject private var productViewModel = ProductViewModel(repository: LocalProductRepository())
+    @EnvironmentObject private var productViewModel: ProductViewModel
     
     var body: some View {
         NavigationStack {
-            ZStack {
                 List {
                     ForEach($productViewModel.products) { product in
                         ProductView(product: product)
@@ -27,10 +26,8 @@ struct GroceryListView: View {
                         }
                     }
                 }
-                LottieView(animation: .named("confetti"))
-                    .playing(loopMode: .loop)
-                    .ignoresSafeArea()
-            }
+            
+        
             
         }
     }
