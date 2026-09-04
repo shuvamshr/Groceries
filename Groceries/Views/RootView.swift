@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import SwiftData
 
 struct RootView: View {
     
@@ -14,7 +15,7 @@ struct RootView: View {
     var body: some View {
         TabView {
             Tab("Home", systemImage: "house.fill") {
-                GroceryListView()
+                GroceryView()
             }
             Tab("Settings", systemImage: "gearshape.fill") {
                 SettingsView()
@@ -26,4 +27,5 @@ struct RootView: View {
 
 #Preview {
     RootView()
+        .modelContainer(for: Grocery.self, inMemory: true)
 }
