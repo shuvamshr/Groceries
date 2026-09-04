@@ -16,9 +16,9 @@ class LocalProductRepository: ProductRepository {
     
     func load() -> [Product] {
         let localProducts = [
-            Product(title: "Pineapple", image: "pineapple"),
-            Product(title: "Tomato", description: "Please get the Roma kind, not the Gourmet. I'll go ham if I receive a Gourmet."),
-            Product(title: "Orange", isPurchased: true)
+            Product(title: "Pineapple", price: 12.99, imageURL: "https://www.publicdomainpictures.net/pictures/540000/nahled/yellow-pineapple-1695980459X0Z.jpg"),
+            Product(title: "Tomato", price: 4.5, imageURL: "https://www.publicdomainpictures.net/pictures/540000/nahled/red-tomato-1695981612wVo.jpg"),
+            Product(title: "Orange", price: 3.5, imageURL: "https://www.publicdomainpictures.net/pictures/540000/nahled/orange-fruit-1695981613Oti.jpg")
         ]
        
         return localProducts

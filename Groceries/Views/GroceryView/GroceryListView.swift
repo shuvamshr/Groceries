@@ -6,33 +6,42 @@
 //
 
 import SwiftUI
+import SwiftData
 import Lottie
 
 struct GroceryListView: View {
     
+    @Bindable var grocery: Grocery
     @EnvironmentObject private var productViewModel: ProductViewModel
     
     var body: some View {
-        NavigationStack {
-                List {
-                    ForEach($productViewModel.products) { product in
-                        ProductView(product: product)
+        List {
+            Section {
+                if grocery.items.isEmpty {
+                    ContentUnavailableView("New Items Yet", systemImage: "carrot.fill", description: Text("Add product from list below to get started"))
+                } else {
+                    ForEach(grocery.items) { item in
+                        GroceryItemView(item: item)
                     }
                 }
-                .toolbar {
-                    ToolbarItem(placement: .confirmationAction) {
-                        Button("Add", systemImage: "plus") {
-                            productViewModel.add(Product(title: "Banana"))
-                        }
-                    }
+                
+            } header: {
+                Text("My List")
+            }
+            Section {
+                ForEach($productViewModel.products) { product in
+                    ProductView(product: product, grocery: grocery)
                 }
-            
-        
+            } header: {
+                Text("Available Products")
+            }
+        }
+        .toolbar {
             
         }
+        .navigationTitle(grocery.title)
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbarVisibility(.hidden, for: .tabBar)
     }
 }
 
-#Preview {
-    GroceryListView()
-}

@@ -10,16 +10,13 @@ import Foundation
 struct Product: Identifiable, Codable {
     var id: String = UUID().uuidString
     var title: String
-    var description: String?
-    var image: String?
-    
-    var isPurchased: Bool = false
-    var quantity: Int = 1
+    var price: Double
+    var imageURL: String?
     
     enum CodingKeys: String, CodingKey {
         case id
         case title = "product_name"
-        case description
-        case image
+        case price
+        case imageURL = "image_url"
     }
 }

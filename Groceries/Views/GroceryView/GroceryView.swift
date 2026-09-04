@@ -18,11 +18,19 @@ struct GroceryView: View {
             Group {
                 if groceries.isEmpty {
                     ContentUnavailableView("No Groceries Yet", systemImage: "basket.fill", description: Text("Add New Grocery List to get Started"))
-                        .navigationTitle("Grocery List")
+        
                 } else {
                     List {
                         ForEach(groceries) { grocery in
-                            
+                            NavigationLink {
+                                GroceryListView(grocery: grocery)
+                            } label: {
+                                HStack {
+                                    Text(grocery.title)
+                                    Spacer()
+                                    Text("\(grocery.items.count)")
+                                }
+                            }
                         }
                     }
                 }
@@ -37,6 +45,7 @@ struct GroceryView: View {
             .sheet(isPresented: $newPlanSheetShowing) {
                 NewPlanView()
             }
+            .navigationTitle("Grocery List")
         }
     }
 }
@@ -44,13 +53,16 @@ struct GroceryView: View {
 struct NewPlanView: View {
     
     @State private var title: String = ""
+    
     @Environment(\.dismiss) private var dismiss
+    
+    @Environment(\.modelContext) private var context
     
     var body: some View {
         NavigationStack {
             Form {
                 Section {
-                    TextField("Enter New Plan", text: $title)
+                    TextField("Enter New Grocery Title", text: $title)
                 } header: {
                     Text("Details")
                 }
@@ -58,8 +70,10 @@ struct NewPlanView: View {
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Save", systemImage: "checkmark") {
-                        
+                        addNewGrocery()
+                        dismiss()
                     }
+                    .disabled(title.isEmpty)
                 }
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel", systemImage: "xmark") {
@@ -67,10 +81,15 @@ struct NewPlanView: View {
                     }
                 }
             }
-            .navigationTitle("New Plan")
+            .navigationTitle("New Grocery List")
             .navigationBarTitleDisplayMode(.inline)
             .interactiveDismissDisabled()
         }
+    }
+    
+    private func addNewGrocery() {
+        let newGrocery = Grocery(title: title)
+        context.insert(newGrocery)
     }
 }
 

@@ -7,58 +7,51 @@
 
 import SwiftUI
 import Lottie
+import SwiftData
 
 struct ProductView: View {
     
     @Binding var product: Product
+    @Bindable var grocery: Grocery
     
     var body: some View {
         HStack(alignment: .top, spacing: 12) {
-            if let image = product.image {
-                Image(image)
+            AsyncImage(url: URL(string: product.imageURL ?? "")) { image in
+                image
                     .resizable()
                     .scaledToFit()
-                    .frame(width: 42)
-                    .clipShape(RoundedRectangle(cornerRadius: 8))
+            } placeholder: {
+                ProgressView()
             }
+            .frame(width: 42, height: 42)
+            .clipShape(RoundedRectangle(cornerRadius: 8))
+               
             VStack(alignment: .leading) {
                 Text(product.title)
-                Text("Qty: \(product.quantity)")
+                Text("Price: \(product.price.formatted(.currency(code: "AUD")))")
                     .font(.footnote)
                     .fontWeight(.bold)
                     .foregroundStyle(Color.secondary)
                    
-                if let description = product.description {
-                    HStack(alignment: .top) {
-                        Image(systemName: "pencil.and.list.clipboard")
-                        Text(description)
-                    }
-                    .font(.caption)
-                    .padding(.top, 4)
-                    .foregroundStyle(Color.secondary)
-                  
-                    
-                }
             }
             Spacer()
             Button {
-                withAnimation {
-                    product.isPurchased.toggle()
-                }
+                addNewItem()
             } label: {
-                if product.isPurchased {
-                    LottieView(animation: .named("success"))
-                        .playing(loopMode: .playOnce)
-                        .animationSpeed(0.5)
-                        .frame(width: 28, height: 28)
-                } else {
-                    Image(systemName: "circle")
+               
+                    Image(systemName: "plus.circle.fill")
                         .imageScale(.large)
-                        .foregroundStyle(Color.gray.opacity(0.5) )
-                }
+                        .foregroundStyle(Color.accentColor)
+           
             }
         }
-        .strikethrough(product.isPurchased)
+       
+    }
+    
+    private func addNewItem() {
+        let newItem = GroceryItem(title: product.title, imageURL: product.imageURL, isPurchased: false, quantity: 0)
+        
+        grocery.items.append(newItem)
     }
 }
 
