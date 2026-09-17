@@ -49,9 +49,12 @@ struct ProductView: View {
     }
     
     private func addNewItem() {
-        let newItem = GroceryItem(title: product.title, imageURL: product.imageURL, isPurchased: false, quantity: 0)
-        
-        grocery.items.append(newItem)
+        if let existingItem = grocery.items.first(where: { $0.title == product.title }) {
+            existingItem.quantity += 1
+        } else {
+            let newItem = GroceryItem(title: product.title, imageURL: product.imageURL, isPurchased: false, quantity: 1)
+            grocery.items.append(newItem)
+        }
     }
 }
 

@@ -13,7 +13,8 @@ struct GroceryListView: View {
     
     @Bindable var grocery: Grocery
     @EnvironmentObject private var productViewModel: ProductViewModel
-    
+    @Environment(\.modelContext) private var modelContext
+
     var body: some View {
         List {
             Section {
@@ -23,8 +24,9 @@ struct GroceryListView: View {
                     ForEach(grocery.items) { item in
                         GroceryItemView(item: item)
                     }
+                    .onDelete(perform: deleteItems)
                 }
-                
+
             } header: {
                 Text("My List")
             }
@@ -42,6 +44,13 @@ struct GroceryListView: View {
         .navigationTitle(grocery.title)
         .navigationBarTitleDisplayMode(.inline)
         .toolbarVisibility(.hidden, for: .tabBar)
+    }
+
+    private func deleteItems(at offsets: IndexSet) {
+        for index in offsets {
+            modelContext.delete(grocery.items[index])
+        }
+        grocery.items.remove(atOffsets: offsets)
     }
 }
 
