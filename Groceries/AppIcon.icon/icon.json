@@ -6,14 +6,13 @@
     {
       "layers" : [
         {
-          "glass" : false,
-          "image-name" : "Image.png",
-          "name" : "Image",
+          "image-name" : "Gemini_Generated_Image_5gqzsu5gqzsu5gqz.jpg",
+          "name" : "Gemini_Generated_Image_5gqzsu5gqzsu5gqz",
           "position" : {
-            "scale" : 1.03,
+            "scale" : 0.74,
             "translation-in-points" : [
-              0,
-              0
+              9.91372797476106,
+              -22.397681720756054
             ]
           }
         }

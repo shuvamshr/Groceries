@@ -1,6 +1,6 @@
 //
-//  Color+Locarey.swift
-//  Locarey
+//  Extra+Color.swift
+//  Groceries
 //
 //  Created by Shuvam Shrestha on 1/10/2026.
 //
