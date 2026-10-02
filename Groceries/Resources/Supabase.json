@@ -1,0 +1,458 @@
+
+# Adding Supabase to the Groceries App
+
+A step-by-step guide for Advanced iOS Development students. Oct 2, 2026
+
+## Before you start
+
+You should already have a Supabase account, an organisation, a project, and the database password saved somewhere safe.
+
+This guide assumes both security options were left **on** when the project was created: **Automatically expose new tables** and **Enable automatic RLS**. Both are under Settings → API if you need to check. They remove a chunk of boilerplate — see Step 3 for what changes if they are off.
+
+The Xcode project should be at its local-only baseline:
+
+- `GroceriesApp` injects `LocalGroceryRepository()`
+- `SupabaseGroceryRepository.swift` exists but holds only its header and `import Foundation`
+- `Product`, `Promotion` and `PriceChange` conform to `Identifiable, Hashable` — **not** `Codable` yet
+- their `CodingKeys` enums are present but currently inert, because nothing decodes
+- no Supabase package in the project
+
+### Work in this order on purpose
+
+The whole database half is finished and verified before a single line of Swift changes.
+
+If you wire the app up first, a blank screen could be a schema problem, a permissions problem, a decoding problem or a networking problem — four layers, one symptom. Finish the backend, prove it with `curl`, and every failure after that is unambiguously in the Swift.
+
+## Step 1 — Create the three tables
+
+The schema comes straight out of the models, and the column names are already decided for you by the `CodingKeys` enums sitting in them:
+
+| Swift | Postgres |
+| --- | --- |
+| `Product.imageURL` | `products.image_url` |
+| `Product.shelfPrice` | `products.shelf_price` |
+| `Product.promotions` | the `promotions` **table** |
+| `Product.priceHistory` | the `price_history` **table** |
+| `Promotion.productID` | `promotions.product_id` |
+| `PriceChange.changedAt` | `price_history.changed_at` |
+
+Make those last rows explicit: `promotions` and `priceHistory` are not columns. They are separate tables that PostgREST folds into each product's JSON — which is exactly why `CodingKeys` maps `priceHistory` to the string `price_history`.
+
+Open the **SQL Editor** and run:
+
+```sql
+create table products (
+  id          uuid primary key default gen_random_uuid(),
+  name        text not null,
+  barcode     text not null unique,
+  category    text not null,
+  image_url   text,
+  shelf_price numeric(10,2) not null
+);
+
+create table promotions (
+  id         uuid primary key default gen_random_uuid(),
+  product_id uuid not null references products(id) on delete cascade,
+  sale_price numeric(10,2) not null,
+  start_date timestamptz not null,
+  end_date   timestamptz not null
+);
+
+create table price_history (
+  id         uuid primary key default gen_random_uuid(),
+  product_id uuid not null references products(id) on delete cascade,
+  price      numeric(10,2) not null,
+  changed_at timestamptz not null default now()
+);
+```
+
+Because of the two project settings, each of these tables arrives already granted to the Data API roles **and** with Row Level Security switched on — which means they return nothing at all until Step 3 gives them a policy.
+
+### Three type choices worth explaining
+
+**`numeric`, never `double precision`.** This is the server-side half of the comment already in `Product.swift` about using `Decimal`. Picking `float8` here would reintroduce on the server exactly the rounding error you avoided in Swift.
+
+**`timestamptz`, never `timestamp`.** Storing an instant with no timezone is the bug that surfaces the moment a student in another timezone runs the app.
+
+**The foreign keys are load-bearing, not decoration.** PostgREST discovers the relationship from the constraint itself. Without `references products(id)`, the embedded `promotions(*)` query in Step 4 simply will not work.
+
+### The invariant to flag now
+
+`shelf_price` is denormalised: it duplicates the newest `price_history` row. Nothing in Postgres enforces that. Keep them in sync when seeding, and see the exercises for the trigger that makes it safe.
+
+## Step 2 — Seed the catalogue
+
+This is the part worth spending time on. A promotion has three possible states relative to *now*, plus the case of having none at all, and `Promotion.isRunning(at:)` is written as `startDate <= date && date < endDate` — both boundaries. Seed data that only ever contains running specials tests none of that.
+
+Nine products, covering all four cases:
+
+| Product | Promotions in the database | Appears under Today's Specials? |
+| --- | --- | --- |
+| Full Cream Milk 2L | 1 running + 1 finished | **Yes** — $2.90 |
+| Ground Coffee 500g | 1 running + 1 finished | **Yes** — $12.00 |
+| Greek Yoghurt 1kg | 1 running | **Yes** — $4.50 |
+| Extra Virgin Olive Oil 750ml | 1 running | **Yes** — $9.75 |
+| Pink Lady Apples 1kg | 1 finished | No — $5.90 regular |
+| Cheddar Block 500g | 1 not started yet | No — $9.50 regular |
+| Sourdough Loaf | none | No |
+| Bananas 1kg | none | No |
+| Butter Croissants 4 Pack | none | No |
+
+### The products
+
+```sql
+insert into products (id, name, barcode, category, image_url, shelf_price) values
+  ('a1b2c3d4-0000-0000-0000-000000000001', 'Full Cream Milk 2L', '9300633603232', 'Dairy',
+   'https://upload.wikimedia.org/wikipedia/commons/thumb/a/a5/Glass_of_Milk_%2833657535532%29.jpg/330px-Glass_of_Milk_%2833657535532%29.jpg', 3.80),
+  ('a1b2c3d4-0000-0000-0000-000000000002', 'Sourdough Loaf', '9310072011691', 'Bakery',
+   'https://upload.wikimedia.org/wikipedia/commons/thumb/3/3b/Home_made_sour_dough_bread.jpg/330px-Home_made_sour_dough_bread.jpg', 6.50),
+  ('a1b2c3d4-0000-0000-0000-000000000003', 'Ground Coffee 500g', '9300605095829', 'Pantry',
+   'https://upload.wikimedia.org/wikipedia/commons/thumb/c/c5/Roasted_coffee_beans.jpg/330px-Roasted_coffee_beans.jpg', 18.00),
+  ('a1b2c3d4-0000-0000-0000-000000000004', 'Pink Lady Apples 1kg', '2000000012345', 'Fruit & Veg',
+   'https://upload.wikimedia.org/wikipedia/commons/thumb/a/a6/Pink_lady_and_cross_section.jpg/330px-Pink_lady_and_cross_section.jpg', 5.90),
+  ('a1b2c3d4-0000-0000-0000-000000000005', 'Greek Yoghurt 1kg', '9300601111116', 'Dairy', null, 6.50),
+  ('a1b2c3d4-0000-0000-0000-000000000006', 'Bananas 1kg', '2000000067890', 'Fruit & Veg',
+   'https://upload.wikimedia.org/wikipedia/commons/thumb/d/de/Bananavarieties.jpg/330px-Bananavarieties.jpg', 3.50),
+  ('a1b2c3d4-0000-0000-0000-000000000007', 'Butter Croissants 4 Pack', '9310072022222', 'Bakery',
+   'https://upload.wikimedia.org/wikipedia/commons/thumb/2/2a/Croissant-Petr_Kratochvil.jpg/330px-Croissant-Petr_Kratochvil.jpg', 5.50),
+  ('a1b2c3d4-0000-0000-0000-000000000008', 'Extra Virgin Olive Oil 750ml', '9300652033333', 'Pantry', null, 13.00),
+  ('a1b2c3d4-0000-0000-0000-000000000009', 'Cheddar Block 500g', '9300601144447', 'Dairy', null, 9.50);
+```
+
+Three products have a `null` image on purpose, so the `ProductImage` placeholder gets exercised. Use `null`, never an empty string — `imageURL` is a `URL?`, and `''` throws a decoding error that fails the **entire** fetch, not just that one product.
+
+### The price history
+
+`shelf_price` above matches the newest row for each product here. Keep it that way.
+
+```sql
+insert into price_history (product_id, price, changed_at) values
+  ('a1b2c3d4-0000-0000-0000-000000000001',  3.50, now() - interval '90 days'),
+  ('a1b2c3d4-0000-0000-0000-000000000001',  3.80, now() - interval '20 days'),
+  ('a1b2c3d4-0000-0000-0000-000000000002',  5.90, now() - interval '120 days'),
+  ('a1b2c3d4-0000-0000-0000-000000000002',  6.20, now() - interval '60 days'),
+  ('a1b2c3d4-0000-0000-0000-000000000002',  6.50, now() - interval '10 days'),
+  ('a1b2c3d4-0000-0000-0000-000000000003', 16.00, now() - interval '100 days'),
+  ('a1b2c3d4-0000-0000-0000-000000000003', 18.00, now() - interval '30 days'),
+  ('a1b2c3d4-0000-0000-0000-000000000004',  5.50, now() - interval '80 days'),
+  ('a1b2c3d4-0000-0000-0000-000000000004',  5.90, now() - interval '15 days'),
+  ('a1b2c3d4-0000-0000-0000-000000000005',  6.00, now() - interval '60 days'),
+  ('a1b2c3d4-0000-0000-0000-000000000005',  6.50, now() - interval '25 days'),
+  ('a1b2c3d4-0000-0000-0000-000000000006',  3.90, now() - interval '90 days'),
+  ('a1b2c3d4-0000-0000-0000-000000000006',  4.50, now() - interval '40 days'),
+  ('a1b2c3d4-0000-0000-0000-000000000006',  3.50, now() - interval '12 days'),
+  ('a1b2c3d4-0000-0000-0000-000000000007',  5.00, now() - interval '70 days'),
+  ('a1b2c3d4-0000-0000-0000-000000000007',  5.50, now() - interval '5 days'),
+  ('a1b2c3d4-0000-0000-0000-000000000008', 11.00, now() - interval '110 days'),
+  ('a1b2c3d4-0000-0000-0000-000000000008', 13.00, now() - interval '50 days'),
+  ('a1b2c3d4-0000-0000-0000-000000000009',  8.80, now() - interval '75 days'),
+  ('a1b2c3d4-0000-0000-0000-000000000009',  9.50, now() - interval '18 days');
+```
+
+Bananas go **down** at the last change, which is the one product whose chart falls rather than rises. Worth having when you are checking the chart renders both directions.
+
+### The promotions — all four cases
+
+```sql
+-- RUNNING NOW: started in the past, ends in the future.
+-- These four are the ones Today's Specials should show.
+insert into promotions (product_id, sale_price, start_date, end_date) values
+  ('a1b2c3d4-0000-0000-0000-000000000001',  2.90, now() - interval '1 day',  now() + interval '3 days'),
+  ('a1b2c3d4-0000-0000-0000-000000000003', 12.00, now() - interval '2 days', now() + interval '5 days'),
+  ('a1b2c3d4-0000-0000-0000-000000000005',  4.50, now() - interval '3 days', now() + interval '4 days'),
+  ('a1b2c3d4-0000-0000-0000-000000000008',  9.75, now() - interval '1 day',  now() + interval '6 days');
+
+-- FINISHED: both dates in the past.
+-- Must NOT show as a special, but MUST still appear as a dip in the price chart.
+insert into promotions (product_id, sale_price, start_date, end_date) values
+  ('a1b2c3d4-0000-0000-0000-000000000004',  3.90, now() - interval '10 days', now() - interval '3 days'),
+  ('a1b2c3d4-0000-0000-0000-000000000001',  2.99, now() - interval '45 days', now() - interval '38 days'),
+  ('a1b2c3d4-0000-0000-0000-000000000003', 13.50, now() - interval '70 days', now() - interval '60 days');
+
+-- NOT STARTED: both dates in the future.
+-- Must NOT show as a special, and must NOT appear in the chart yet either.
+insert into promotions (product_id, sale_price, start_date, end_date) values
+  ('a1b2c3d4-0000-0000-0000-000000000009',  7.25, now() + interval '2 days', now() + interval '9 days');
+```
+
+Sourdough, bananas and croissants get no rows at all — the plain case.
+
+### Two decisions worth explaining
+
+**Dates are relative, never hardcoded.** Every timestamp is `now()` plus or minus an interval, which is the SQL equivalent of the day-offsets `LocalGroceryRepository` uses. Hardcode real dates and the seed quietly rots: a few weeks into semester every special has expired and the Specials tab is empty, which students will report as a bug in your app.
+
+**The UUIDs are fixed, and they match the sample data.** A `PriceLock` saved against the local repository still resolves after switching to Supabase, because `viewModel.product(for:)` matches on `productID`. Change the IDs and every previously saved lock falls back to the "no longer in the catalogue" branch — handled gracefully, but confusing to debug mid-lesson.
+
+### What you should see once the app is wired up
+
+Four cards under Today's Specials. Apples and cheddar at their regular price. The apples chart showing a dip that is over; the cheddar chart showing no dip at all yet.
+
+## Step 3 — Write the policies
+
+Postgres has **two independent gates**, and both must pass before a row reaches the app. Students conflate them constantly, so it is worth naming them even though your project settings handle most of the work:
+
+| Layer | Question it answers | What failure looks like |
+| --- | --- | --- |
+| `GRANT` | May this role touch the table at all? | `permission denied for table …` (error 42501) |
+| RLS policy | Which rows may it see? | `200 OK` with `[]` |
+
+**Automatically expose new tables** handles the first gate: it sets default privileges so every new table in `public` is granted to the Data API roles as it is created. No `grant` statements to write.
+
+**Enable automatic RLS** flips the second gate on: an event trigger runs `enable row level security` for you. No `alter table` statements either.
+
+What neither setting can infer is **which rows each role may read**. That is the policy, and it is the one thing you still write by hand — which is as it should be, because it is the only part that encodes your actual intent.
+
+### The three policies
+
+```sql
+create policy "Catalogue is public" on public.products
+  for select to anon using (true);
+
+create policy "Promotions are public" on public.promotions
+  for select to anon using (true);
+
+create policy "Price history is public" on public.price_history
+  for select to anon using (true);
+```
+
+All three tables need a policy. The symptom differs depending on which you forget: no policy on `products` gives you `[]` at the top level, while no policy on `promotions` gives you products back with empty nested arrays — every product silently losing its specials. That second one is much harder to spot.
+
+Read-only is also the correct shape here: `GroceryRepository` only declares `fetchProducts()`, and the catalogue is managed in Supabase itself.
+
+### Teach this by causing it
+
+With automatic RLS on, the empty-array failure happens for free — every table starts locked. Run the `curl` from Step 4 **before** adding the policies and you get `[]`; run it after and you get data. Same request, two outcomes, one line of SQL between them.
+
+To show the other gate, the one your project settings are handling silently, have a student run `revoke select on products from anon;` and watch the same request turn into `permission denied for table products`. Then `grant select on products to anon;` to put it back.
+
+Two failure modes, deliberately triggered, in about a minute — and both are ones they will meet alone later.
+
+### If the project settings were off
+
+You would also need `grant usage on schema public to anon;` plus `grant select` on each table, and an `alter table … enable row level security;` for each. Worth mentioning so students who inherit a differently configured project know what to look for.
+
+## Step 4 — Verify before writing any Swift
+
+Grab the **Project URL** and the **publishable key** from Project Settings → API. Newer projects show a key beginning `sb_publishable_`; older ones show a JWT labelled `anon public`. Either works.
+
+Run the exact query the app will run:
+
+```bash
+curl "https://<ref>.supabase.co/rest/v1/products?select=*,promotions(*),price_history(*)&order=name" -H "apikey: <publishable-key>"
+```
+
+You are looking for nine products, each with nested `promotions` and `price_history` arrays, sorted by name.
+
+| What you get | What it means |
+| --- | --- |
+| Nine products with nested arrays | Done. Move to the app. |
+| `[]` | Policy missing on `products`, or the seed never ran |
+| Products with empty `promotions` arrays | Policy missing on `promotions` or `price_history` |
+| `permission denied for table products` | Unexpected with your settings — see Troubleshooting |
+
+To tell those last two apart, run `select count(*) from public.products;` in the SQL Editor — it connects as a privileged role and bypasses RLS. Zero means the seed never landed; nine means RLS is filtering.
+
+### Why this step exists
+
+Do not let the first test of your schema also be the first test of your networking code. Everything from here is Swift, and if this `curl` works, then anything that breaks later is in the app — which halves the search space every single time.
+
+## Step 5 — Add the supabase-swift package
+
+**File → Add Package Dependencies**, and paste:
+
+```
+https://github.com/supabase/supabase-swift.git
+```
+
+Dependency rule **Up to Next Major Version, from 2.0.0**. The package needs iOS 16+, so the project's iOS 26 target is fine.
+
+Xcode then asks which **library product** to add — and this is a list, not a single checkbox, which catches people out. You will see `Supabase`, `Auth`, `PostgREST`, `Realtime`, `Storage` and `Functions`.
+
+Add **`Supabase`** to the **Groceries** target only. Not the widget extension — it has no need of it, and adding it there only slows the build.
+
+### Why the umbrella rather than just PostgREST
+
+A read-only catalogue genuinely only needs `PostgREST`, and narrow dependencies are a reasonable instinct to encourage. But `PostgrestClient` on its own means wiring the `apikey` and `Authorization` headers by hand, which is precisely the plumbing you are adopting the SDK to avoid. Take the umbrella; mention the trade-off.
+
+## Step 6 — Make the models decodable
+
+Add `Decodable` to the three types that come from the server:
+
+```swift
+struct Product: Identifiable, Hashable, Decodable { … }
+struct Promotion: Identifiable, Hashable, Decodable { … }
+struct PriceChange: Identifiable, Hashable, Decodable { … }
+```
+
+### Three things to point out
+
+**`Decodable`, not `Codable`.** The app only reads — `GroceryRepository` has exactly one method and it fetches. Conforming to `Encodable` as well would advertise a capability nothing uses, and invite someone to assume writes are supported.
+
+**`PricePoint` is deliberately left alone.** It never comes from the server; `priceTimeline()` computes it on the device from the other two. A good question to put to students: which of the four models should be decodable, and how would you know without being told? The answer is whichever ones appear in the JSON — which they can see from the `curl` output in Step 4.
+
+**The `CodingKeys` enums come back to life.** They have been sitting inert in those files, because `CodingKeys` is only consulted by a synthesised `Codable` conformance. Adding `Decodable` is what makes `image_url` → `imageURL` and `price_history` → `priceHistory` start working.
+
+### Worth letting them fail first
+
+If you want the lesson to land, have them add `Decodable` but **delete** one `CodingKeys` enum first. The decode fails with a missing-key error naming `shelfPrice`, and they get to work out why the server said `shelf_price`. The SDK does not apply `.convertFromSnakeCase`, so those mappings are doing real work, not decoration.
+
+## Step 7 — Write the repository
+
+`SupabaseGroceryRepository.swift` is currently just a header and `import Foundation`. Fill it in:
+
+```swift
+import Foundation
+import Supabase
+
+/// Fetches the catalogue from Supabase. The project URL and publishable key
+/// come from Project Settings → API. The publishable key is safe to ship:
+/// Row Level Security is what actually constrains it.
+struct SupabaseGroceryRepository: GroceryRepository {
+    private let client: SupabaseClient
+
+    init(projectURL: URL, publishableKey: String) {
+        client = SupabaseClient(
+            supabaseURL: projectURL,
+            supabaseKey: publishableKey
+        )
+    }
+
+    func fetchProducts() async throws -> [Product] {
+        try await client
+            .from("products")
+            .select("*, promotions(*), price_history(*)")
+            .order("name")
+            .execute()
+            .value
+    }
+}
+```
+
+### What to draw out
+
+**The select string is the same PostgREST syntax as the `curl`.** Show them side by side. The SDK is a wrapper around the request they already ran by hand, not a different mechanism — otherwise it reads as magic.
+
+**`.value` is where decoding happens.** `.execute()` returns a response; `.value` decodes it. Nothing in that chain names `Product` — the return type of `fetchProducts()` is what drives the inference. This genuinely surprises students, and it is worth pausing on.
+
+**`.order("name")` is not optional.** PostgREST has no inherent row order, and the product grid alternates cards between two columns by array index. Without it, the layout reshuffles between launches and students will think they have a SwiftUI bug.
+
+**`client` is `private`.** Nothing outside this type has any business reaching the SDK.
+
+### The architectural point
+
+After this step, `import Supabase` appears in exactly **one file** in the whole project. `ContentView`, `ProductListViewModel` and every view still compile without the SDK in scope. That is the test of whether the protocol is doing its job — and it is why previews keep working offline against `LocalGroceryRepository`.
+
+## Step 8 — Swap it in
+
+`GroceriesApp.swift` already has a comment marking the spot. One line changes:
+
+```swift
+@main
+struct GroceriesApp: App {
+    private let repository: any GroceryRepository = SupabaseGroceryRepository(
+        projectURL: URL(string: "https://<ref>.supabase.co")!,
+        publishableKey: "<publishable-key>"
+    )
+
+    var body: some Scene {
+        WindowGroup {
+            ContentView(repository: repository)
+        }
+        .modelContainer(for: PriceLock.self)
+    }
+}
+```
+
+Build and run. Four specials, nine products, charts drawn from server data.
+
+### Note what did *not* change
+
+Nothing else. No view, no view model, no SwiftData code. `categories` still derives itself from the fetched data, so the category pills populate from Postgres with no code change at all. Switching back is a one-line undo.
+
+That payoff is the whole argument for the repository protocol, and it only becomes visible at this exact moment — so say it out loud while it is in front of them.
+
+### The pattern to warn them about
+
+Almost every Supabase tutorial online declares a file-scope global:
+
+```swift
+let supabase = SupabaseClient(supabaseURL: …, supabaseKey: …)
+```
+
+Students will find this within one search, so address it head-on rather than letting it quietly replace your design. It works, but it is a singleton any file can reach: it dissolves the repository boundary, makes `LocalGroceryRepository` pointless, and means a `#Preview` can silently hit the network.
+
+Good contrast to teach deliberately — the tutorial version optimises for a five-minute demo, yours optimises for being swappable and testable.
+
+### Where the credentials live
+
+Start with the literals inline, as above. It is honest for a first pass and keeps the lesson on wiring.
+
+Move them to an `.xcconfig` feeding `Info.plist` as a **separate** step, once the app actually fetches. And be precise about why: the publishable key is *designed* to ship in the client, so this is not a secrets-management lesson. The real reasons are that students should not commit your project's credentials, and swapping dev for prod should not mean editing source. Oversell it as a security measure and you teach the wrong model of what the key is.
+
+## Troubleshooting
+
+### `200 OK` with `[]`
+
+Either RLS has no matching policy, or the table is empty. Run `select count(*) from public.products;` in the SQL Editor to tell them apart.
+
+If rows exist, check the policy actually targets `anon`:
+
+```sql
+select tablename, policyname, roles, cmd, qual
+from pg_policies where schemaname = 'public';
+```
+
+`to authenticated` is the most common slip — it looks right and silently excludes every request the app makes.
+
+**This is the dangerous one**, because in the app it is not an error at all. `loadProducts()` succeeds, nothing throws, and the screen shows "No Products". A misconfigured database is indistinguishable from an empty one. Worth asking students whether it *should* be, and where they would draw that line.
+
+### `permission denied for table products`
+
+With **Automatically expose new tables** on, you should not see this. If you do, one of three things happened: someone revoked the grant, the table was created in a schema the Data API does not expose, or the project setting was turned off after the table was made.
+
+It is error 42501, raised before row filtering ever runs — so it is never an RLS problem, however much it looks like one. Put it back with:
+
+```sql
+grant select on table public.products to anon;
+```
+
+### Products come back, but every `promotions` array is empty
+
+Policy missing on `promotions` or `price_history` specifically. The parent query succeeds, the embedded one is filtered to nothing. Nothing in the app will look broken — you just lose every special.
+
+### Dates fail to decode
+
+Postgres `timestamptz` arrives as an ISO-8601 string, sometimes with fractional seconds and sometimes without. A hand-rolled `JSONDecoder` defaults to `.deferredToDate`, which expects a number, and throws on every row.
+
+The SDK ships a decoder that handles this, and it is the main thing it buys you over a hand-rolled `URLSession` version. Confirm it against a real row anyway rather than assuming.
+
+### Prices look subtly wrong
+
+Two separate causes, worth distinguishing:
+
+- **`shelf_price` drifted from the newest `price_history` row.** The card reads the stored `product.shelfPrice`, while `PriceLock` snapshots the computed `shelfPrice(at:)`. They disagree, so the card shows one regular price and the lock records another — including a wrong "Save $X" badge.
+- **Precision loss on `numeric`.** It arrives as an unquoted JSON number. Test one real price end to end; this is exactly the failure the `Decimal` choice exists to prevent, so it deserves a deliberate check rather than an assumption.
+
+### "The operation couldn't be completed"
+
+If you see this, something is still throwing `URLError`. The SDK throws `PostgrestError` with `message`, `detail`, `hint` and `code` — surface `error.message` in `ProductListViewModel.errorMessage` and an RLS failure will say so in plain words.
+
+This is a genuinely good moment to show students what a well-designed error type is worth.
+
+## Exercises
+
+Roughly in order of difficulty.
+
+**1. Make the error message useful.** `ProductListViewModel` stores `error.localizedDescription`. Catch `PostgrestError` and surface `message` instead. Have them break RLS on purpose and compare the two.
+
+**2. Test the promotion boundaries.** `GroceriesTests` is an empty struct. `Promotion.isRunning(at:)` is `startDate <= date && date < endDate` — pure, synchronous, trivially testable, and the seed data in Step 2 gives four cases to assert against. Ask what happens at exactly `endDate`, and whether that is right.
+
+**3. Enforce the `shelf_price` invariant.** Write a trigger on `products` that inserts into `price_history` whenever `shelf_price` changes. The doc comment on `PriceChange` already promises this — "recorded by a database trigger" — so the code is describing a thing that does not exist yet. Good illustration that a denormalised column needs an enforced invariant, not just good intentions.
+
+**4. Get the decode off the main thread.** As written, `SupabaseGroceryRepository` is `@MainActor` by default, so JSON parsing happens on the main thread. Mark it `nonisolated` and see what the compiler demands.
+
+This is the payoff exercise. `[Product]` now has to cross an isolation boundary, so the models need `Sendable` — and students meet the keyword at the exact moment it is load-bearing, rather than as something they were told to type. Do it in that order: write it the simple way, show the main-thread decode, then fix it and let the compiler ask.
+
+**5. Add paging or search server-side.** Search is currently client-side over everything fetched. Fine for nine products, wrong for nine thousand. Move it to PostgREST with `.ilike()` and discuss where that boundary sits.
+
+**6. Give the widget real data.** `GroceriesWidget` is still placeholder scaffolding. It cannot read the SwiftData store without an App Group, which is a meaty and self-contained follow-up.
