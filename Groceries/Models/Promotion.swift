@@ -7,7 +7,7 @@
 
 import Foundation
 
-struct Promotion: Identifiable, Hashable {
+struct Promotion: Identifiable, Hashable, Codable {
     let id: UUID
     let productID: UUID
     let salePrice: Decimal

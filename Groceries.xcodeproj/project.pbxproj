@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		4B8C8EC3306F5F810007ED46 /* Supabase in Frameworks */ = {isa = PBXBuildFile; productRef = 4B8C8EC2306F5F810007ED46 /* Supabase */; };
 		4BA09998305CE6C400A9BA6E /* WidgetKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 4BA09997305CE6C400A9BA6E /* WidgetKit.framework */; };
 		4BA0999A305CE6C400A9BA6E /* SwiftUI.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 4BA09999305CE6C400A9BA6E /* SwiftUI.framework */; };
 		4BA099A5305CE6C600A9BA6E /* GroceriesWidgetExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 4BA09995305CE6C400A9BA6E /* GroceriesWidgetExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
@@ -88,6 +89,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				4B8C8EC3306F5F810007ED46 /* Supabase in Frameworks */,
 				4BD7EFC7303805D2007D113C /* Lottie in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -164,6 +166,7 @@
 			name = Groceries;
 			packageProductDependencies = (
 				4BD7EFC6303805D2007D113C /* Lottie */,
+				4B8C8EC2306F5F810007ED46 /* Supabase */,
 			);
 			productName = Groceries;
 			productReference = 30C0F9523025491100EC3C23 /* Groceries.app */;
@@ -247,6 +250,7 @@
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
 				4BD7EFC5303805D2007D113C /* XCRemoteSwiftPackageReference "lottie-ios" */,
+				4B8C8EC1306F5F810007ED46 /* XCRemoteSwiftPackageReference "supabase-swift" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 30C0F9533025491100EC3C23 /* Products */;
@@ -659,6 +663,14 @@
 /* End XCConfigurationList section */
 
 /* Begin XCRemoteSwiftPackageReference section */
+		4B8C8EC1306F5F810007ED46 /* XCRemoteSwiftPackageReference "supabase-swift" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/supabase/supabase-swift.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 2.5.1;
+			};
+		};
 		4BD7EFC5303805D2007D113C /* XCRemoteSwiftPackageReference "lottie-ios" */ = {
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/airbnb/lottie-ios.git";
@@ -670,6 +682,11 @@
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
+		4B8C8EC2306F5F810007ED46 /* Supabase */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 4B8C8EC1306F5F810007ED46 /* XCRemoteSwiftPackageReference "supabase-swift" */;
+			productName = Supabase;
+		};
 		4BD7EFC6303805D2007D113C /* Lottie */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = 4BD7EFC5303805D2007D113C /* XCRemoteSwiftPackageReference "lottie-ios" */;

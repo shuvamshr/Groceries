@@ -10,9 +10,10 @@ import SwiftData
 
 @main
 struct GroceriesApp: App {
-    // Swap for SupabaseGroceryRepository(projectURL:anonKey:) to use Supabase.
-    private let repository: any GroceryRepository = LocalGroceryRepository()
 
+    private let repository: any GroceryRepository = SupabaseGroceryRepository(projectURL: URL(string: "https://omogbyofwrznlduxihuj.supabase.co")!, publishableKey: "sb_publishable_qA3Z2JXbPAcbiL8x5asliw_u-nEdHpI")
+
+    
     var body: some Scene {
         WindowGroup {
             ContentView(repository: repository)

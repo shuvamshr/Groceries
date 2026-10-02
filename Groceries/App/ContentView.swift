@@ -29,6 +29,6 @@ struct ContentView: View {
 }
 
 #Preview {
-    ContentView(repository: LocalGroceryRepository())
+    ContentView(repository: SupabaseGroceryRepository(projectURL: URL(string: "https://omogbyofwrznlduxihuj.supabase.co")!, publishableKey: "sb_publishable_qA3Z2JXbPAcbiL8x5asliw_u-nEdHpI"))
         .modelContainer(for: PriceLock.self, inMemory: true)
 }
