@@ -8,7 +8,7 @@
 import Foundation
 
 /// One change to a product's regular price, recorded by a database trigger.
-nonisolated struct PriceChange: Identifiable, Hashable, Codable, Sendable {
+nonisolated struct PriceChange: Identifiable, Hashable {
     let id: UUID
     let productID: UUID
     let price: Decimal

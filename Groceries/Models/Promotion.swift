@@ -7,7 +7,7 @@
 
 import Foundation
 
-nonisolated struct Promotion: Identifiable, Hashable, Codable, Sendable {
+struct Promotion: Identifiable, Hashable {
     let id: UUID
     let productID: UUID
     let salePrice: Decimal

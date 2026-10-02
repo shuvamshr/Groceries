@@ -10,7 +10,7 @@ import Foundation
 /// Read-only catalogue data from the server, so a `Codable` struct rather than
 /// a SwiftData model. Prices are `Decimal` because `Double` can't represent
 /// most money amounts exactly.
-nonisolated struct Product: Identifiable, Hashable, Codable, Sendable {
+struct Product: Identifiable, Hashable {
     let id: UUID
     let name: String
     let barcode: String
